@@ -17,3 +17,9 @@ variable "region" {}
 variable "db_name" { default = "creative_studio" }
 variable "db_user" { default = "studio_user" }
 variable "db_password" { sensitive = true }
+
+variable "network_name" {
+  description = "Name of the existing VPC (created via gcloud) that Cloud SQL should attach to."
+  type        = string
+  default     = "creative-studio-vpc"
+}
