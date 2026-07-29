@@ -31,6 +31,18 @@ resource "google_artifact_registry_repository" "repo" {
   format        = "DOCKER"
 }
 
+# Look up the existing VPC + subnet for Direct VPC egress
+data "google_compute_network" "vpc" {
+  name    = var.vpc_network_name
+  project = var.gcp_project_id
+}
+
+data "google_compute_subnetwork" "subnet" {
+  name    = var.vpc_subnet_name
+  region  = var.gcp_region
+  project = var.gcp_project_id
+}
+
 resource "google_cloud_run_v2_service" "this" {
   name             = var.service_name
   location         = var.gcp_region
@@ -39,6 +51,17 @@ resource "google_cloud_run_v2_service" "this" {
 
   template {
     service_account = google_service_account.run_sa.email
+
+    # Direct VPC egress: routes only private ranges via the VPC, so the
+    # Cloud SQL Auth Proxy sidecar can reach the private DB IP.
+    vpc_access {
+      network_interfaces {
+        network    = data.google_compute_network.vpc.self_link
+        subnetwork = data.google_compute_subnetwork.subnet.self_link
+      }
+      egress = "PRIVATE_RANGES_ONLY"
+    }
+
     volumes {
       name = "cloudsql"
       cloud_sql_instance {
