@@ -12,18 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Look up the pre-existing VPC that was created with gcloud.
+# Private Services Access must already be configured on this VPC.
+data "google_compute_network" "vpc" {
+  name    = var.network_name
+  project = var.project_id
+}
+
 resource "random_id" "db_name_suffix" {
   byte_length = 4
 }
 
 resource "google_sql_database_instance" "default" {
   name             = "creative-studio-db-${random_id.db_name_suffix.hex}"
-  database_version = "POSTGRES_18" # Latest stable version
+  database_version = "POSTGRES_17" # Current GA default; POSTGRES_18 is not GA in every region
   region           = var.region
   project          = var.project_id
 
   settings {
-    tier = "db-perf-optimized-N-2"
+    tier    = "db-perf-optimized-N-2"
+    edition = "ENTERPRISE_PLUS" # Required for db-perf-optimized-* tiers; omit if you want the API to auto-derive
     
     # Enable IAM Authentication for better security (optional but recommended)
     database_flags {
@@ -32,7 +40,9 @@ resource "google_sql_database_instance" "default" {
     }
 
     ip_configuration {
-      ipv4_enabled = true # Easy connectivity from Cloud Run without VPC peering complexity
+      ipv4_enabled                                  = false
+      private_network                               = data.google_compute_network.vpc.self_link
+      enable_private_path_for_google_cloud_services = true
     }
   }
   
