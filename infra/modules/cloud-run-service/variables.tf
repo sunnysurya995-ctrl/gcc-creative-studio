@@ -129,3 +129,16 @@ variable "db_secret_id" {
 }
 variable "db_name" { type = string }
 variable "db_user" { type = string }
+
+# VPC egress for reaching private Cloud SQL IP
+variable "vpc_network_name" {
+  description = "Name of the VPC to attach the Cloud Run service to for private egress."
+  type        = string
+  default     = "creative-studio-vpc"
+}
+
+variable "vpc_subnet_name" {
+  description = "Name of the subnet in the VPC for Direct VPC egress."
+  type        = string
+  default     = "creative-studio-subnet-usc1"
+}
