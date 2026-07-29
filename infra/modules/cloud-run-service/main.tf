@@ -56,8 +56,8 @@ resource "google_cloud_run_v2_service" "this" {
     # Cloud SQL Auth Proxy sidecar can reach the private DB IP.
     vpc_access {
       network_interfaces {
-        network    = data.google_compute_network.vpc.self_link
-        subnetwork = data.google_compute_subnetwork.subnet.self_link
+        network    = data.google_compute_network.vpc.name
+        subnetwork = data.google_compute_subnetwork.subnet.name
       }
       egress = "PRIVATE_RANGES_ONLY"
     }
