@@ -86,10 +86,6 @@ resource "google_cloud_run_v2_service" "this" {
         value = "/cloudsql/${var.cloud_sql_connection_name}"
       }
       env {
-        name = "USE_CLOUD_SQL_AUTH_PROXY"
-        value = "true"
-      }
-      env {
         name = "DB_NAME"
         value = var.db_name
       }
