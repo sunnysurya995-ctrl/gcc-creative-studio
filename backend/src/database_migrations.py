@@ -21,7 +21,7 @@ import sys
 
 import asyncpg
 
-from src.database import get_connection
+from src.database import get_connection, async_session_local
 
 logger = logging.getLogger(__name__)
 
@@ -123,3 +123,79 @@ async def run_pending_migrations():
                 logger.error(
                     "Error releasing lock or closing connection: %s", e
                 )
+
+
+
+async def ensure_default_workspace():
+    """Creates a default public workspace if none exists.
+    This is called on startup to ensure the app is usable.
+    """
+    from src.workspaces.repository.workspace_repository import WorkspaceRepository
+    from src.workspaces.schema.workspace_model import (
+        WorkspaceModel,
+        WorkspaceScopeEnum,
+    )
+    from src.users.repository.user_repository import UserRepository
+    from src.users.user_model import UserRoleEnum
+    from src.config.config_service import config_service
+
+    logger.info("Checking for default public workspace...")
+
+    try:
+        async with async_session_local() as db:
+            workspace_repo = WorkspaceRepository(db)
+
+            # Check if a public workspace already exists
+            public_workspace = await workspace_repo.get_public_workspace()
+            if public_workspace:
+                logger.info(
+                    f"Public workspace already exists: '{public_workspace.name}' (ID: {public_workspace.id})"
+                )
+                return
+
+            logger.warning("No public workspace found. Creating a default one...")
+
+            # We need an owner. Try to find any existing user or create a system user.
+            user_repo = UserRepository(db)
+
+            # Try to find an admin user first
+            from sqlalchemy import select
+            from src.users.user_model import UserModel
+
+            stmt = select(UserModel).limit(1)
+            result = await db.execute(stmt)
+            owner = result.scalar_one_or_none()
+
+            if not owner:
+                # Create a system user to own the workspace
+                logger.info("No users found. Creating a system user...")
+                from src.users.dto.user_create_dto import UserCreateDto
+
+                system_user_data = {
+                    "email": "system@creative-studio.local",
+                    "name": "System",
+                    "roles": [UserRoleEnum.USER, UserRoleEnum.ADMIN],
+                }
+                owner = await user_repo.create(system_user_data)
+                logger.info(f"Created system user with ID: {owner.id}")
+
+            # Create the default workspace
+            project_id = config_service.PROJECT_ID or "creative-studio"
+            workspace_name = (
+                project_id.replace("-", " ").replace("_", " ").title()
+                + " Workspace"
+            )
+
+            default_workspace = WorkspaceModel(
+                name=workspace_name,
+                owner_id=owner.id,
+                scope=WorkspaceScopeEnum.PUBLIC,
+                members=[],
+            )
+            created = await workspace_repo.create(default_workspace)
+            logger.info(
+                f"Default public workspace '{workspace_name}' created successfully (ID: {created.id})."
+            )
+
+    except Exception as e:
+        logger.error(f"Failed to ensure default workspace exists: {e}", exc_info=True)
