@@ -125,7 +125,6 @@ async def run_pending_migrations():
                 )
 
 
-
 async def ensure_default_workspace():
     """Creates a default public workspace if none exists.
     This is called on startup to ensure the app is usable.
@@ -136,8 +135,9 @@ async def ensure_default_workspace():
         WorkspaceScopeEnum,
     )
     from src.users.repository.user_repository import UserRepository
-    from src.users.user_model import UserRoleEnum
+    from src.users.user_model import UserRoleEnum, User
     from src.config.config_service import config_service
+    from sqlalchemy import select
 
     logger.info("Checking for default public workspace...")
 
@@ -158,23 +158,19 @@ async def ensure_default_workspace():
             # We need an owner. Try to find any existing user or create a system user.
             user_repo = UserRepository(db)
 
-            # Try to find an admin user first
-            from sqlalchemy import select
-            from src.users.user_model import UserModel
-
-            stmt = select(UserModel).limit(1)
+            # Try to find any user first (use the SQLAlchemy model User, not UserModel)
+            stmt = select(User).limit(1)
             result = await db.execute(stmt)
             owner = result.scalar_one_or_none()
 
             if not owner:
                 # Create a system user to own the workspace
                 logger.info("No users found. Creating a system user...")
-                from src.users.dto.user_create_dto import UserCreateDto
 
                 system_user_data = {
                     "email": "system@creative-studio.local",
                     "name": "System",
-                    "roles": [UserRoleEnum.USER, UserRoleEnum.ADMIN],
+                    "roles": [UserRoleEnum.USER.value, UserRoleEnum.ADMIN.value],
                 }
                 owner = await user_repo.create(system_user_data)
                 logger.info(f"Created system user with ID: {owner.id}")
