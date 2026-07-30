@@ -106,9 +106,10 @@ async def lifespan(app: FastAPI):
 
     # Run Database Migrations
     try:
-        from src.database_migrations import run_pending_migrations
+        from src.database_migrations import run_pending_migrations, ensure_default_workspace
 
         await run_pending_migrations()
+        await ensure_default_workspace()
     except Exception as e:
         logger.error(f"Failed to run database migrations: {e}")
         # We might want to stop startup here if migrations fail
